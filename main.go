@@ -6,6 +6,9 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+	"time"
+
+	"github.com/go-faster/jx"
 )
 
 var ls []Legend
@@ -16,7 +19,6 @@ var STR1 = "asrgfsadf12421"
 var STR2 = "asrgfsadf12321"
 
 func main() {
-
 	fmt.Println("Тестовый сервер Golang")
 	plan, _ := os.ReadFile("primitives.json")
 
@@ -25,11 +27,13 @@ func main() {
 		fmt.Print("Не могу прочитать json ", err)
 	}
 
-	http.HandleFunc("/map", func(w http.ResponseWriter, r *http.Request) {
+	mux := http.NewServeMux()
+
+	mux.HandleFunc("/map", func(w http.ResponseWriter, r *http.Request) {
 
 		query := r.URL.Query()
-		xStr := query["x"][0]
-		yStr := query["y"][0]
+		xStr := query.Get("x")
+		yStr := query.Get("y")
 
 		x, _ := strconv.ParseFloat(xStr, 64)
 		y, _ := strconv.ParseFloat(yStr, 64)
@@ -37,7 +41,10 @@ func main() {
 		x /= 100
 		y /= 100
 
-		resultLs := build(ls,
+		arena := getArena()
+		defer putArena(arena)
+
+		n := build(arena, ls,
 			&DrawPr{LeftTop: []float64{pr.LeftTop[0] + x, pr.LeftTop[1] + y}, Scale: pr.Scale, Mashtab: pr.Mashtab},
 			&Rect{
 				Left:   rect.Left + x,
@@ -45,14 +52,14 @@ func main() {
 				Right:  rect.Right,
 				Bottom: rect.Bottom})
 
-		fmt.Fprint(w, len(resultLs))
+		fmt.Fprint(w, len(n))
 	})
 
-	http.HandleFunc("/mapJSON", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/mapJSON", func(w http.ResponseWriter, r *http.Request) {
 
 		query := r.URL.Query()
-		xStr := query["x"][0]
-		yStr := query["y"][0]
+		xStr := query.Get("x")
+		yStr := query.Get("y")
 
 		x, _ := strconv.ParseFloat(xStr, 64)
 		y, _ := strconv.ParseFloat(yStr, 64)
@@ -60,7 +67,10 @@ func main() {
 		x /= 100
 		y /= 100
 
-		resultLs := build(ls,
+		arena := getArena()
+		defer putArena(arena)
+
+		resultLs := build(arena, ls,
 			&DrawPr{LeftTop: []float64{pr.LeftTop[0] + x, pr.LeftTop[1] + y}, Scale: pr.Scale, Mashtab: pr.Mashtab},
 			&Rect{
 				Left:   rect.Left + x,
@@ -68,32 +78,47 @@ func main() {
 				Right:  rect.Right,
 				Bottom: rect.Bottom})
 
-		b, err := json.Marshal(resultLs[:5])
+		e := jx.GetEncoder()
+		defer jx.PutEncoder(e)
 
-		if err != nil {
-			fmt.Print("Не могу сохранить json ", err)
+		if len(resultLs) > 5 {
+			resultLs = resultLs[:5]
 		}
+		encodeLayers(e, resultLs)
 
 		w.Header().Set("Content-Type", "application/json")
-
-		w.Write(b)
+		w.Write(e.Bytes())
 	})
 
-	http.HandleFunc("/naturalsort", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/naturalsort", func(w http.ResponseWriter, r *http.Request) {
+		buf1 := append(make([]byte, 0, len(STR1)+5), STR1...)
+		buf2 := append(make([]byte, 0, len(STR2)+5), STR2...)
+
 		result := 0
 		for i := range 10000 {
-			result += Compare(STR1+strconv.Itoa(i), STR2+strconv.Itoa(i))
+			s1 := string(strconv.AppendInt(buf1[:len(STR1)], int64(i), 10))
+			s2 := string(strconv.AppendInt(buf2[:len(STR2)], int64(i), 10))
+			result += Compare(s1, s2)
 		}
 
 		fmt.Fprint(w, result)
 	})
 
-	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprint(w, "Hello World golang!")
 	})
 
+	server := &http.Server{
+		Addr:              "localhost:4000",
+		Handler:           mux,
+		ReadHeaderTimeout: 5 * time.Second,
+		ReadTimeout:       10 * time.Second,
+		WriteTimeout:      10 * time.Second,
+		IdleTimeout:       60 * time.Second,
+	}
+
 	fmt.Println("ListenAndServe [localhost:4000]")
-	httpErr := http.ListenAndServe("localhost:4000", nil)
+	httpErr := server.ListenAndServe()
 
 	if httpErr != nil {
 		panic(httpErr)
