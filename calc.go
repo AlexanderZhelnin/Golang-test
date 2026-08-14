@@ -1,122 +1,109 @@
+//go:build !goexperiment.simd
+
 package main
 
-import (
-	"github.com/viterin/vek"
-)
+import "unsafe"
 
-func translate(cs []float64, pr *DrawPr) {
-
-	// for i := 0; i < len(cs); i += 2 {
-	// 	result := vek.MulNumber(vek.Sub(cs[i:i+2], pr.LeftTop), pr.Scale)
-
-	// 	cs[i] = result[0]
-	// 	cs[i+1] = -result[1]
-	// }
-
-	for i := 0; i < len(cs); i += 2 {
-
-		cs[i] = (cs[i] - pr.LeftTop[0]) * pr.Scale
-		cs[i+1] = (pr.LeftTop[1] - cs[i+1]) * pr.Scale
-	}
+// читает координату по индексу без bounds check - эквивалент чтения
+// P[i] через fixed (double* P = ...) в C# IsPointOnLine. Координаты всегда
+// идут парами, поэтому index+1 < len
+func loadCoord(base unsafe.Pointer, index int) float64 {
+	return *(*float64)(unsafe.Add(base, uintptr(index)*8))
 }
 
-func optimize(mas []float64, l float64) []float64 {
-
+// optimize повторяет C# Calc.Optimize: короткий вход уже
+// является защитной копией и возвращается без второй копии; для длинного входа
+// решения об удалении точек принимаются по исходным координатам, а оставленные
+// точки записываются в новый буфер без преобразования. Проверка точки
+// заинлайнена вручную (аналог AggressiveInlining в C#), загрузки идут через
+// указатели (аналог fixed double* там же). SIMD-вариант подключается только при
+// GOEXPERIMENT=simd (calc_simd_experiment.go) и совпадает по решениям бит-в-бит
+func optimize(mas []float64, l float64, result *floatScratch) []float64 {
 	count := len(mas)
-	var coords []float64
-
 	if count < 5 {
 		return mas
 	}
 
-	coords = make([]float64, 0, count)
+	coords := result.makeSlice(0, count)
+	coords = append(coords, mas[0], mas[1])
 
 	index1 := 0
 	index2 := 2
-	coords = append(coords, mas[index1:index1+2]...)
+	distance := l * l
 
-	// Кэшируем distance*distance — избегаем пересчёта
-	lSq := l * l
+	base := unsafe.Pointer(unsafe.SliceData(mas))
+	for index := 4; index < count; index += 2 {
+		px1 := loadCoord(base, index1)
+		py1 := loadCoord(base, index1+1)
+		px2 := loadCoord(base, index2)
+		py2 := loadCoord(base, index2+1)
+		px := loadCoord(base, index)
+		py := loadCoord(base, index+1)
 
-	for i := 4; i < count; i += 2 {
-		if !IsPointOnLineOld(mas[index1:index1+2], mas[index2:index2+2], mas[i:i+2], lSq) {
-			index1 = i - 2
-			index2 = i
-			coords = append(coords, mas[index1:index1+2]...)
+		a := px - px1
+		b := py - py1
+		c := px2 - px1
+		d := py2 - py1
+		lengthSquared := c*c + d*d
+
+		var nearestX, nearestY float64
+		if lengthSquared == 0 {
+			nearestX = px1
+			nearestY = py1
+		} else {
+			parameter := (a*c + b*d) / lengthSquared
+			if parameter < 0 {
+				nearestX = px1
+				nearestY = py1
+			} else if parameter > 1 {
+				nearestX = px2
+				nearestY = py2
+			} else {
+				nearestX = px1 + parameter*c
+				nearestY = py1 + parameter*d
+			}
+		}
+
+		dx := px - nearestX
+		dy := py - nearestY
+		if !(dx*dx+dy*dy < distance) {
+			index1 = index - 2
+			index2 = index
+			coords = append(coords, loadCoord(base, index1), loadCoord(base, index1+1))
 		}
 	}
 
-	coords = append(coords, mas[count-2], mas[count-1])
-
-	return coords
+	return append(coords, mas[count-2], mas[count-1])
 }
 
-func IsPointOnLine(p1 []float64, p2 []float64, p []float64, distance float64) bool {
-
-	ab := vek.Sub(p, p1)
-	cd := vek.Sub(p2, p1)
-
-	lenSq := vek.Dot(cd, cd)
-
-	if lenSq == 0 {
-		// Точки совпадают — расстояние до точки
-		return vek.Dot(ab, ab) < distance
-	}
-
-	param := vek.Dot(ab, cd) / lenSq
-
-	var xy []float64
-	if param < 0 {
-		xy = p1
-	} else if param > 1 {
-		xy = p2
-	} else {
-		xy = vek.Add(p1, vek.MulNumber(cd, param))
-	}
-
-	dp := vek.Sub(p, xy)
-
-	return vek.Dot(dp, dp) < distance
-}
-
-func IsPointOnLineOld(p1 []float64, p2 []float64, p []float64, distance float64) bool {
-
-	px1 := p1[0]
-	py1 := p1[1]
-	px2 := p2[0]
-	py2 := p2[1]
-	px := p[0]
-	py := p[1]
-
+func isPointOnLine(px1, py1, px2, py2, px, py, distance float64) bool {
 	a := px - px1
 	b := py - py1
 	c := px2 - px1
 	d := py2 - py1
 
-	lenSq := c*c + d*d
-
-	if lenSq == 0 {
-		// Точки совпадают — расстояние до точки
+	lengthSquared := c*c + d*d
+	if lengthSquared == 0 {
 		dx := px - px1
 		dy := py - py1
 		return dx*dx+dy*dy < distance
 	}
 
-	param := (a*c + b*d) / lenSq
+	parameter := (a*c + b*d) / lengthSquared
 
-	var xx, yy float64
-	if param < 0 {
-		xx = px1
-		yy = py1
-	} else if param > 1 {
-		xx = px2
-		yy = py2
+	var nearestX, nearestY float64
+	if parameter < 0 {
+		nearestX = px1
+		nearestY = py1
+	} else if parameter > 1 {
+		nearestX = px2
+		nearestY = py2
 	} else {
-		xx = px1 + param*c
-		yy = py1 + param*d
+		nearestX = px1 + parameter*c
+		nearestY = py1 + parameter*d
 	}
 
-	dx := px - xx
-	dy := py - yy
+	dx := px - nearestX
+	dy := py - nearestY
 	return dx*dx+dy*dy < distance
 }

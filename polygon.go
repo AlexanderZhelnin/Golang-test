@@ -1,191 +1,163 @@
 package main
 
-func clipPolygon(g *Primitive, rect *Rect) []float64 {
-	curIndex := 0
+func nextCoordIndex(current, length int) int {
+	current += 2
+	if current >= length {
+		return 0
+	}
+	return current
+}
 
-	getNextIndex := func(coords []float64) int {
-		curIndex += 2
-		if curIndex >= len(coords) {
-			curIndex = 0
-		}
-
-		return curIndex
+func clipPolygonLeft(coords []float64, left float64, scratch *floatScratch) []float64 {
+	if len(coords) == 0 {
+		return coords
 	}
 
-	clipLeft := func(coords []float64, left float64) []float64 {
-		if len(coords) == 0 {
-			return coords
-		}
-
-		curIndex = 0
-		pl := make([]float64, 0)
-
-		index := getNextIndex(coords)
-
-		px1 := coords[index]
-		py1 := coords[index+1]
-
-		if px1 >= left {
-			pl = append(pl, px1, py1)
-		}
-
-		len := len(coords) / 2
-		for i := 1; i <= len; i++ {
-			index = getNextIndex(coords)
-			px2 := coords[index]
-			py2 := coords[index+1]
-
-			if px1 >= left && px2 >= left {
-				pl = append(pl, px2, py2)
-			} else if px1 < left && px2 > left {
-				pl = append(pl, left, (left-px1)*(py2-py1)/(px2-px1)+py1, px2, py2)
-			} else if px1 > left && px2 < left {
-				pl = append(pl, left, (left-px1)*(py2-py1)/(px2-px1)+py1)
-			}
-			px1 = px2
-			py1 = py2
-		}
-
-		return pl
+	polygon := scratch.makeSlice(0, len(coords)*2)
+	current := 0
+	px1, py1 := coords[0], coords[1]
+	if px1 >= left {
+		polygon = append(polygon, px1, py1)
 	}
 
-	clipRight := func(coords []float64, right float64) []float64 {
-		if len(coords) == 0 {
-			return coords
+	for range len(coords) / 2 {
+		current = nextCoordIndex(current, len(coords))
+		px2, py2 := coords[current], coords[current+1]
+
+		if px1 >= left && px2 >= left {
+			polygon = append(polygon, px2, py2)
+		} else if px1 < left && px2 > left {
+			polygon = append(
+				polygon,
+				left, (left-px1)*(py2-py1)/(px2-px1)+py1,
+				px2, py2,
+			)
+		} else if px1 > left && px2 < left {
+			polygon = append(polygon, left, (left-px1)*(py2-py1)/(px2-px1)+py1)
 		}
-
-		curIndex = 0
-
-		pl := make([]float64, 0)
-
-		index := getNextIndex(coords)
-
-		px1 := coords[index]
-		py1 := coords[index+1]
-
-		if px1 <= right {
-			pl = append(pl, px1, py1)
-		}
-
-		len := len(coords) / 2
-
-		for i := 0; i < len; i++ {
-			index = getNextIndex(coords)
-
-			px2 := coords[index]
-			py2 := coords[index+1]
-
-			if px1 <= right && px2 <= right {
-				pl = append(pl, px2, py2)
-			} else if px1 > right && px2 < right {
-				pl = append(pl, right, (right-px1)*(py2-py1)/(px2-px1)+py1, px2, py2)
-			} else if px1 < right && px2 > right {
-				pl = append(pl, right, (right-px1)*(py2-py1)/(px2-px1)+py1)
-			}
-			px1 = px2
-			py1 = py2
-		}
-
-		return pl
+		px1, py1 = px2, py2
 	}
 
-	clipBottom := func(coords []float64, bottom float64) []float64 {
-		if len(coords) == 0 {
-			return coords
-		}
+	return polygon
+}
 
-		curIndex = 0
-
-		pl := make([]float64, 0)
-
-		index := getNextIndex(coords)
-
-		px1 := coords[index]
-		py1 := coords[index+1]
-
-		if py1 >= bottom {
-			pl = append(pl, px1, py1)
-		}
-
-		len := len(coords) / 2
-		for i := 0; i < len; i++ {
-			index = getNextIndex(coords)
-			px2 := coords[index]
-			py2 := coords[index+1]
-
-			if py1 >= bottom && py2 >= bottom {
-				pl = append(pl, px2, py2)
-			} else if py1 < bottom && py2 > bottom {
-				pl = append(pl, (bottom-py1)*(px2-px1)/(py2-py1)+px1, bottom, px2, py2)
-			} else if py1 > bottom && py2 < bottom {
-				pl = append(pl, (bottom-py1)*(px2-px1)/(py2-py1)+px1, bottom)
-			}
-			px1 = px2
-			py1 = py2
-		}
-
-		return pl
+func clipPolygonRight(coords []float64, right float64, scratch *floatScratch) []float64 {
+	if len(coords) == 0 {
+		return coords
 	}
 
-	clipTop := func(coords []float64, top float64) []float64 {
-		if len(coords) == 0 {
-			return coords
-		}
-		curIndex = 0
-
-		pl := make([]float64, 0)
-
-		index := getNextIndex(coords)
-
-		px1 := coords[index]
-		py1 := coords[index+1]
-
-		if py1 <= top {
-			pl = append(pl, px1)
-			pl = append(pl, py1)
-		}
-
-		len := len(coords) / 2
-		for i := 0; i < len; i++ {
-
-			index = getNextIndex(coords)
-			px2 := coords[index]
-			py2 := coords[index+1]
-
-			if py1 <= top && py2 <= top {
-				pl = append(pl, px2, py2)
-			} else if py1 < top && py2 > top {
-				pl = append(pl, (top-py1)*(px2-px1)/(py2-py1)+px1, top)
-			} else if py1 > top && py2 < top {
-				pl = append(pl, (top-py1)*(px2-px1)/(py2-py1)+px1, top, px2, py2)
-			}
-
-			px1 = px2
-			py1 = py2
-		}
-
-		return pl
+	polygon := scratch.makeSlice(0, len(coords)*2)
+	current := 0
+	px1, py1 := coords[0], coords[1]
+	if px1 <= right {
+		polygon = append(polygon, px1, py1)
 	}
 
-	var res []float64
+	for range len(coords) / 2 {
+		current = nextCoordIndex(current, len(coords))
+		px2, py2 := coords[current], coords[current+1]
 
-	if g.Rect.Left < rect.Left {
-		res = clipLeft(g.Coords, rect.Left)
+		if px1 <= right && px2 <= right {
+			polygon = append(polygon, px2, py2)
+		} else if px1 > right && px2 < right {
+			polygon = append(
+				polygon,
+				right, (right-px1)*(py2-py1)/(px2-px1)+py1,
+				px2, py2,
+			)
+		} else if px1 < right && px2 > right {
+			polygon = append(polygon, right, (right-px1)*(py2-py1)/(px2-px1)+py1)
+		}
+		px1, py1 = px2, py2
+	}
+
+	return polygon
+}
+
+func clipPolygonBottom(coords []float64, bottom float64, scratch *floatScratch) []float64 {
+	if len(coords) == 0 {
+		return coords
+	}
+
+	polygon := scratch.makeSlice(0, len(coords)*2)
+	current := 0
+	px1, py1 := coords[0], coords[1]
+	if py1 >= bottom {
+		polygon = append(polygon, px1, py1)
+	}
+
+	for range len(coords) / 2 {
+		current = nextCoordIndex(current, len(coords))
+		px2, py2 := coords[current], coords[current+1]
+
+		if py1 >= bottom && py2 >= bottom {
+			polygon = append(polygon, px2, py2)
+		} else if py1 < bottom && py2 > bottom {
+			polygon = append(
+				polygon,
+				(bottom-py1)*(px2-px1)/(py2-py1)+px1, bottom,
+				px2, py2,
+			)
+		} else if py1 > bottom && py2 < bottom {
+			polygon = append(polygon, (bottom-py1)*(px2-px1)/(py2-py1)+px1, bottom)
+		}
+		px1, py1 = px2, py2
+	}
+
+	return polygon
+}
+
+func clipPolygonTop(coords []float64, top float64, scratch *floatScratch) []float64 {
+	if len(coords) == 0 {
+		return coords
+	}
+
+	polygon := scratch.makeSlice(0, len(coords)*2)
+	current := 0
+	px1, py1 := coords[0], coords[1]
+	if py1 <= top {
+		polygon = append(polygon, px1, py1)
+	}
+
+	for range len(coords) / 2 {
+		current = nextCoordIndex(current, len(coords))
+		px2, py2 := coords[current], coords[current+1]
+
+		if py1 <= top && py2 <= top {
+			polygon = append(polygon, px2, py2)
+		} else if py1 > top && py2 < top {
+			polygon = append(
+				polygon,
+				(top-py1)*(px2-px1)/(py2-py1)+px1, top,
+				px2, py2,
+			)
+		} else if py1 < top && py2 > top {
+			polygon = append(polygon, (top-py1)*(px2-px1)/(py2-py1)+px1, top)
+		}
+		px1, py1 = px2, py2
+	}
+
+	return polygon
+}
+
+func clipPolygon(primitive *Primitive, rect *Rect, scratch *floatScratch) []float64 {
+	var result []float64
+	if primitive.Rect.Left < rect.Left {
+		result = clipPolygonLeft(primitive.Coords, rect.Left, scratch)
 	} else {
-		res = append(res, g.Coords...)
+		result = scratch.makeSlice(len(primitive.Coords), len(primitive.Coords))
+		copy(result, primitive.Coords)
 	}
 
-	if g.Rect.Bottom < rect.Bottom {
-		res = clipBottom(res, rect.Bottom)
+	if primitive.Rect.Bottom < rect.Bottom {
+		result = clipPolygonBottom(result, rect.Bottom, scratch)
+	}
+	if primitive.Rect.Right > rect.Right {
+		result = clipPolygonRight(result, rect.Right, scratch)
+	}
+	if primitive.Rect.Top > rect.Top {
+		result = clipPolygonTop(result, rect.Top, scratch)
 	}
 
-	if g.Rect.Right > rect.Right {
-		res = clipRight(res, rect.Right)
-	}
-
-	if g.Rect.Top > rect.Top {
-		res = clipTop(res, rect.Top)
-	}
-
-	return res
+	return result
 }

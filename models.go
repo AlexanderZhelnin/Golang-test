@@ -78,7 +78,7 @@ type Legend struct {
 }
 
 type DrawPr struct {
-	LeftTop []float64
+	LeftTop [2]float64
 	Scale   float64
 	Mashtab float64
 }
