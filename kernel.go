@@ -1,62 +1,89 @@
 package main
 
-func build(ls []Legend, pr *DrawPr, rect *Rect) []Layer {
-	result := make([]Layer, len(ls))
-	mashtab := 1 / pr.Scale
-
-	for index, l := range ls {
-
-		if l.MashtabRange.Min > pr.Mashtab || l.MashtabRange.Max < pr.Mashtab {
-			continue
-		}
-
-		obrazes := make([]Obraz, 0)
-
-		for _, obraz := range clipPrimitives(&l, rect) {
-			csOpt := optimize(obraz.Coords, mashtab)
-
-			translate(csOpt, pr)
-			obrazes = append(obrazes, Obraz{Name: obraz.Name, Coords: csOpt})
-		}
-
-		result[index] = Layer{LegendId: l.Id, Obrazes: obrazes}
-	}
-
+// build повторяет C# Drawer.Build / Rust build: /mapJSON строит []Layer
+// целиком. Реализован поверх visitLayers, как Rust build = build_iter.collect.
+func build(ls []Legend, pr *DrawPr, rect *Rect, scratch *buildScratch) []Layer {
+	result := scratch.layers.makeSlice(0, len(ls), defaultLayerChunkCapacity)
+	visitLayers(ls, pr, rect, scratch, func(layer Layer) bool {
+		result = append(result, layer)
+		return true
+	})
 	return result
 }
 
-func clipPrimitives(l *Legend, rect *Rect) []Obraz {
-	result := make([]Obraz, 0)
+// visitLayers повторяет форму Rust visit_clipped_primitives/build_iter: слой
+// передаётся потребителю сразу после построения, как C# yield return, но через
+// прямой вызов callback. Раньше здесь был iter.Seq (range-over-func); прямые
+// вызовы дают ту же ленивость без обвязки rangefunc-замыканий, которую LLVM
+// у Rust инлайнит полностью
+func visitLayers(ls []Legend, pr *DrawPr, rect *Rect, scratch *buildScratch, yield func(Layer) bool) {
+	mashtab := 1 / pr.Scale
 
-	for _, g := range l.Primitives {
-		if g.Rect.Left >= rect.Left &&
-			g.Rect.Bottom >= rect.Bottom &&
-			g.Rect.Right <= rect.Right &&
-			g.Rect.Top <= rect.Top {
-			// Целиком лежит внутри прямоугольника
+	for index := range ls {
+		legend := &ls[index]
+		if legend.MashtabRange.Min > pr.Mashtab || legend.MashtabRange.Max < pr.Mashtab {
+			continue
+		}
 
-			coords := make([]float64, len(g.Coords))
-			copy(coords, g.Coords)
+		obrazes := scratch.obrazes.makeSlice(0, len(legend.Primitives), defaultObrazChunkCapacity)
+		visitClippedPrimitives(legend, rect, scratch, func(obraz Obraz) bool {
+			// Как C# Optimize(...).Translate(...):
+			// сначала отдельный проход с решениями об удалении точек, затем
+			// отдельный in-place проход перевода в экранные координаты
+			coords := optimize(obraz.Coords, mashtab, &scratch.result)
+			translate(coords, pr)
+			obrazes = append(obrazes, Obraz{Name: obraz.Name, Coords: coords})
+			return true
+		})
 
-			result = append(result, Obraz{Name: g.Name, Coords: coords})
+		if !yield(Layer{LegendId: legend.Id, Obrazes: obrazes}) {
+			return
+		}
+	}
+}
 
-		} else if g.Rect.Left < rect.Right &&
-			g.Rect.Bottom < rect.Top &&
-			g.Rect.Right > rect.Left &&
-			g.Rect.Top > rect.Bottom {
-			// Необходимо отсекать
-			switch l.Type {
-			case 1:
-				for _, cs := range clipPolyline(&g, rect) {
-					result = append(result, Obraz{Name: g.Name, Coords: cs})
+func visitClippedPrimitives(legend *Legend, rect *Rect, scratch *buildScratch, emit func(Obraz) bool) {
+	for index := range legend.Primitives {
+		// Короткие координаты Optimize возвращает в той же защитной копии, как
+		// C# и Rust. Поэтому temporary нельзя сбрасывать между примитивами:
+		// /map сбрасывает его после потребления слоя, а /mapJSON - только после
+		// сериализации всего ответа
+		primitive := &legend.Primitives[index]
+		if primitive.Rect.Left >= rect.Left &&
+			primitive.Rect.Bottom >= rect.Bottom &&
+			primitive.Rect.Right <= rect.Right &&
+			primitive.Rect.Top <= rect.Top {
+			// Защитная копия исходных координат - как C# `[.. g.Coords]`
+			// тот же объём чтений и записей на
+			// целиком видимый примитив
+			source := primitive.Coords
+			coords := scratch.temporary.makeSlice(len(source), len(source))
+			copy(coords, source)
+			if !emit(Obraz{Name: primitive.Name, Coords: coords}) {
+				return
+			}
+			continue
+		}
+
+		if primitive.Rect.Left >= rect.Right ||
+			primitive.Rect.Bottom >= rect.Top ||
+			primitive.Rect.Right <= rect.Left ||
+			primitive.Rect.Top <= rect.Bottom {
+			continue
+		}
+
+		switch legend.Type {
+		case 1:
+			for _, coords := range clipPolyline(primitive, rect, &scratch.temporary) {
+				if !emit(Obraz{Name: primitive.Name, Coords: coords}) {
+					return
 				}
-			case 2:
-				cs := clipPolygon(&g, rect)
-				if len(cs) > 0 {
-					result = append(result, Obraz{Name: g.Name, Coords: cs})
-				}
+			}
+		case 2:
+			coords := clipPolygon(primitive, rect, &scratch.temporary)
+			if len(coords) > 0 && !emit(Obraz{Name: primitive.Name, Coords: coords}) {
+				return
 			}
 		}
 	}
-	return result
 }
