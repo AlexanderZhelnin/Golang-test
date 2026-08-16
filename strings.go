@@ -14,32 +14,39 @@ func Compare(s1 string, s2 string) int {
 		return 1
 	}
 
-	r1, r2 := []rune(s1), []rune(s2)
-
 	i1, i2 := 0, 0
-
-	len1, len2 := len(r1), len(r2)
+	len1, len2 := len(s1), len(s2)
 
 	for i1 < len1 {
 		if i2 == len2 {
 			return 1
 		}
 
-		if r1[i1] >= '0' && r1[i1] <= '9' && r2[i2] >= '0' && r2[i2] <= '9' {
-			num1, num2 := r1[i1]-'0', r2[i2]-'0'
+		b1, b2 := s1[i1], s2[i2]
+
+		if b1 >= '0' && b1 <= '9' && b2 >= '0' && b2 <= '9' {
+			num1, num2 := int(b1-'0'), int(b2-'0')
 
 			i1++
 			i2++
 
 			// Читаем остальные цифры первого числа
-			for i1 < len1 && r1[i1] >= '0' && r1[i1] <= '9' {
-				num1 = 10*num1 + r1[i1] - '0'
+			for i1 < len1 {
+				b := s1[i1]
+				if b < '0' || b > '9' {
+					break
+				}
+				num1 = 10*num1 + int(b-'0')
 				i1++
 			}
 
 			// Читаем остальные цифры второго числа
-			for i2 < len2 && r2[i2] >= '0' && r2[i2] <= '9' {
-				num2 = 10*num2 + r2[i2] - '0'
+			for i2 < len2 {
+				b := s2[i2]
+				if b < '0' || b > '9' {
+					break
+				}
+				num2 = 10*num2 + int(b-'0')
 				i2++
 			}
 
@@ -51,9 +58,9 @@ func Compare(s1 string, s2 string) int {
 				}
 			}
 		} else {
-			// Сравниваем как символы
-			if r1[i1] != r2[i2] {
-				if r1[i1] > r2[i2] {
+			// Сравниваем как байты
+			if b1 != b2 {
+				if b1 > b2 {
 					return 1
 				} else {
 					return -1
@@ -70,5 +77,4 @@ func Compare(s1 string, s2 string) int {
 	} else {
 		return -1
 	}
-
 }
