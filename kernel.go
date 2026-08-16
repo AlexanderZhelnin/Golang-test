@@ -1,7 +1,7 @@
 package main
 
 func build(arena *Arena, ls []Legend, pr *DrawPr, rect *Rect) []Layer {
-	result := make([]Layer, len(ls))
+	result := arena.allocLayerCap(len(ls))[:len(ls)]
 	mashtab := 1 / pr.Scale
 
 	for index := range ls {
@@ -11,9 +11,9 @@ func build(arena *Arena, ls []Legend, pr *DrawPr, rect *Rect) []Layer {
 			continue
 		}
 
-		obrazes := make([]Obraz, 0, len(l.Primitives))
-
-		for _, obraz := range clipPrimitives(arena, l, rect) {
+		clipped := clipPrimitives(arena, l, rect)
+		obrazes := arena.allocObrazCap(len(clipped))
+		for _, obraz := range clipped {
 			csOpt := optimize(arena, obraz.Coords, mashtab)
 
 			translate(csOpt, pr)
@@ -27,7 +27,7 @@ func build(arena *Arena, ls []Legend, pr *DrawPr, rect *Rect) []Layer {
 }
 
 func clipPrimitives(arena *Arena, l *Legend, rect *Rect) []Obraz {
-	result := make([]Obraz, 0, len(l.Primitives))
+	result := arena.allocObrazCap(len(l.Primitives))
 
 	for i := range l.Primitives {
 		g := &l.Primitives[i]
