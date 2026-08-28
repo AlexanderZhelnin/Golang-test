@@ -1,0 +1,13 @@
+/bin/
+
+/test.exe
+
+# go test -c
+*.test
+*.test.exe
+
+*.pprof
+default.pgo
+
+coverage.out
+*.prof

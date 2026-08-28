@@ -1,74 +1,65 @@
 package main
 
 func Compare(s1 string, s2 string) int {
-	// Быстрые проверки
-	ne1, ne2 := len(s1) == 0, len(s2) == 0
+	return CompareRunes([]rune(s1), []rune(s2))
+}
 
-	if ne1 && ne2 {
-		return 0
-	}
-	if ne1 {
-		return -1
-	}
-	if ne2 {
-		return 1
-	}
+func CompareRunes(first []rune, second []rune) int {
 
-	r1, r2 := []rune(s1), []rune(s2)
+	index1, index2 := 0, 0
 
-	i1, i2 := 0, 0
-
-	len1, len2 := len(r1), len(r2)
-
-	for i1 < len1 {
-		if i2 == len2 {
+	for index1 < len(first) {
+		if index2 >= len(second) {
 			return 1
 		}
 
-		if r1[i1] >= '0' && r1[i1] <= '9' && r2[i2] >= '0' && r2[i2] <= '9' {
-			num1, num2 := r1[i1]-'0', r2[i2]-'0'
+		char1 := first[index1]
+		char2 := second[index2]
+		index1++
+		index2++
 
-			i1++
-			i2++
+		if isASCIIDigit(char1) && isASCIIDigit(char2) {
+			number1 := int32(char1 - '0')
+			number2 := int32(char2 - '0')
 
-			// Читаем остальные цифры первого числа
-			for i1 < len1 && r1[i1] >= '0' && r1[i1] <= '9' {
-				num1 = 10*num1 + r1[i1] - '0'
-				i1++
-			}
-
-			// Читаем остальные цифры второго числа
-			for i2 < len2 && r2[i2] >= '0' && r2[i2] <= '9' {
-				num2 = 10*num2 + r2[i2] - '0'
-				i2++
-			}
-
-			if num1 != num2 {
-				if num1 > num2 {
-					return 1
-				} else {
-					return -1
+			for index1 < len(first) {
+				digit := first[index1]
+				if !isASCIIDigit(digit) {
+					break
 				}
-			}
-		} else {
-			// Сравниваем как символы
-			if r1[i1] != r2[i2] {
-				if r1[i1] > r2[i2] {
-					return 1
-				} else {
-					return -1
-				}
+				number1 = number1*10 + int32(digit-'0')
+				index1++
 			}
 
-			i1++
-			i2++
+			for index2 < len(second) {
+				digit := second[index2]
+				if !isASCIIDigit(digit) {
+					break
+				}
+				number2 = number2*10 + int32(digit-'0')
+				index2++
+			}
+
+			if number1 != number2 {
+				if number1 > number2 {
+					return 1
+				}
+				return -1
+			}
+		} else if char1 != char2 {
+			if char1 > char2 {
+				return 1
+			}
+			return -1
 		}
 	}
 
-	if i2 == len2 {
+	if index2 == len(second) {
 		return 0
-	} else {
-		return -1
 	}
+	return -1
+}
 
+func isASCIIDigit(value rune) bool {
+	return value >= '0' && value <= '9'
 }
