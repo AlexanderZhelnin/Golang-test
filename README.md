@@ -47,8 +47,6 @@ bin/api-pgo.exe
 go tool build --workers 100 --warmup-seconds 1 --training-seconds 5
 ```
 
-Нагрузки `/map` и `/mapJSON` циклически используют запрос без параметров
-
 ## GOAMD64
 
 Уровень определяется по процессору автоматически и печатается при каждом
@@ -61,13 +59,3 @@ go tool build --workers 100 --warmup-seconds 1 --training-seconds 5
 ```text
 go tool build --goamd64 v3
 ```
-
-# Замер
-
-```text
-go tool bench
-```
-
-Замеряются все четыре варианта — выбора варианта нет, смысл замера именно в
-сравнении сборок между собой. Профили для `pgo`-вариантов снимаются заново, как
-и в `build`.
