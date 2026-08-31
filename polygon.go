@@ -18,12 +18,11 @@ func clipPolygon(g *Primitive, rect *Rect) []float64 {
 		}
 
 		curIndex = 0
-		pl := make([]float64, 0)
+		pl := make([]float64, 0, len(coords))
 
 		index := getNextIndex(coords)
 
-		px1 := coords[index]
-		py1 := coords[index+1]
+		px1, py1 := coords[index], coords[index+1]
 
 		if px1 >= left {
 			pl = append(pl, px1, py1)
@@ -32,8 +31,7 @@ func clipPolygon(g *Primitive, rect *Rect) []float64 {
 		len := len(coords) / 2
 		for i := 1; i <= len; i++ {
 			index = getNextIndex(coords)
-			px2 := coords[index]
-			py2 := coords[index+1]
+			px2, py2 := coords[index], coords[index+1]
 
 			if px1 >= left && px2 >= left {
 				pl = append(pl, px2, py2)
@@ -42,8 +40,7 @@ func clipPolygon(g *Primitive, rect *Rect) []float64 {
 			} else if px1 > left && px2 < left {
 				pl = append(pl, left, (left-px1)*(py2-py1)/(px2-px1)+py1)
 			}
-			px1 = px2
-			py1 = py2
+			px1, py1 = px2, py2
 		}
 
 		return pl
@@ -56,12 +53,11 @@ func clipPolygon(g *Primitive, rect *Rect) []float64 {
 
 		curIndex = 0
 
-		pl := make([]float64, 0)
+		pl := make([]float64, 0, len(coords))
 
 		index := getNextIndex(coords)
 
-		px1 := coords[index]
-		py1 := coords[index+1]
+		px1, py1 := coords[index], coords[index+1]
 
 		if px1 <= right {
 			pl = append(pl, px1, py1)
@@ -69,11 +65,10 @@ func clipPolygon(g *Primitive, rect *Rect) []float64 {
 
 		len := len(coords) / 2
 
-		for i := 0; i < len; i++ {
+		for range len {
 			index = getNextIndex(coords)
 
-			px2 := coords[index]
-			py2 := coords[index+1]
+			px2, py2 := coords[index], coords[index+1]
 
 			if px1 <= right && px2 <= right {
 				pl = append(pl, px2, py2)
@@ -82,8 +77,7 @@ func clipPolygon(g *Primitive, rect *Rect) []float64 {
 			} else if px1 < right && px2 > right {
 				pl = append(pl, right, (right-px1)*(py2-py1)/(px2-px1)+py1)
 			}
-			px1 = px2
-			py1 = py2
+			px1, py1 = px2, py2
 		}
 
 		return pl
@@ -100,18 +94,16 @@ func clipPolygon(g *Primitive, rect *Rect) []float64 {
 
 		index := getNextIndex(coords)
 
-		px1 := coords[index]
-		py1 := coords[index+1]
+		px1, py1 := coords[index], coords[index+1]
 
 		if py1 >= bottom {
 			pl = append(pl, px1, py1)
 		}
 
 		len := len(coords) / 2
-		for i := 0; i < len; i++ {
+		for range len {
 			index = getNextIndex(coords)
-			px2 := coords[index]
-			py2 := coords[index+1]
+			px2, py2 := coords[index], coords[index+1]
 
 			if py1 >= bottom && py2 >= bottom {
 				pl = append(pl, px2, py2)
@@ -120,8 +112,7 @@ func clipPolygon(g *Primitive, rect *Rect) []float64 {
 			} else if py1 > bottom && py2 < bottom {
 				pl = append(pl, (bottom-py1)*(px2-px1)/(py2-py1)+px1, bottom)
 			}
-			px1 = px2
-			py1 = py2
+			px1, py1 = px2, py2
 		}
 
 		return pl
@@ -133,24 +124,21 @@ func clipPolygon(g *Primitive, rect *Rect) []float64 {
 		}
 		curIndex = 0
 
-		pl := make([]float64, 0)
+		pl := make([]float64, 0, len(coords))
 
 		index := getNextIndex(coords)
 
-		px1 := coords[index]
-		py1 := coords[index+1]
+		px1, py1 := coords[index], coords[index+1]
 
 		if py1 <= top {
-			pl = append(pl, px1)
-			pl = append(pl, py1)
+			pl = append(pl, px1, py1)
 		}
 
 		len := len(coords) / 2
-		for i := 0; i < len; i++ {
+		for range len {
 
 			index = getNextIndex(coords)
-			px2 := coords[index]
-			py2 := coords[index+1]
+			px2, py2 := coords[index], coords[index+1]
 
 			if py1 <= top && py2 <= top {
 				pl = append(pl, px2, py2)
@@ -160,8 +148,7 @@ func clipPolygon(g *Primitive, rect *Rect) []float64 {
 				pl = append(pl, (top-py1)*(px2-px1)/(py2-py1)+px1, top, px2, py2)
 			}
 
-			px1 = px2
-			py1 = py2
+			px1, py1 = px2, py2
 		}
 
 		return pl

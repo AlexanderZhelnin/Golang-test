@@ -10,16 +10,14 @@ func clipLeft(coords []float64, left float64) [][]float64 {
 
 	pl := make([]float64, 0)
 
-	px1 := coords[0]
-	py1 := coords[1]
+	px1, py1 := coords[0], coords[1]
 
 	if px1 >= left {
 		pl = append(pl, px1, py1)
 	}
 
 	for i := 2; i < len(coords); i += 2 {
-		px2 := coords[i]
-		py2 := coords[i+1]
+		px2, py2 := coords[i], coords[i+1]
 
 		if px1 >= left && px2 >= left {
 			pl = append(pl, px2, py2)
@@ -53,8 +51,7 @@ func clipRight(coords []float64, right float64) [][]float64 {
 
 	pl := make([]float64, 0)
 
-	px1 := coords[0]
-	py1 := coords[1]
+	px1, py1 := coords[0], coords[1]
 
 	if px1 <= right {
 		pl = append(pl, px1, py1)
@@ -62,8 +59,7 @@ func clipRight(coords []float64, right float64) [][]float64 {
 
 	for i := 2; i < len(coords); i += 2 {
 
-		px2 := coords[i]
-		py2 := coords[i+1]
+		px2, py2 := coords[i], coords[i+1]
 
 		if px1 <= right && px2 <= right {
 			pl = append(pl, px2, py2)
@@ -76,8 +72,7 @@ func clipRight(coords []float64, right float64) [][]float64 {
 			res = append(res, pl)
 			pl = make([]float64, 0)
 		}
-		px1 = px2
-		py1 = py2
+		px1, py1 = px2, py2
 	}
 
 	if len(pl) > 0 {
@@ -95,16 +90,14 @@ func clipBottom(coords []float64, bottom float64) [][]float64 {
 
 	pl := make([]float64, 0)
 
-	px1 := coords[0]
-	py1 := coords[1]
+	px1, py1 := coords[0], coords[1]
 
 	if py1 >= bottom {
 		pl = append(pl, px1, py1)
 	}
 
 	for i := 2; i < len(coords); i += 2 {
-		px2 := coords[i]
-		py2 := coords[i+1]
+		px2, py2 := coords[i], coords[i+1]
 
 		if py1 >= bottom && py2 >= bottom {
 			pl = append(pl, px2, py2)
@@ -116,8 +109,7 @@ func clipBottom(coords []float64, bottom float64) [][]float64 {
 			res = append(res, pl)
 			pl = make([]float64, 0)
 		}
-		px1 = px2
-		py1 = py2
+		px1, py1 = px2, py2
 	}
 	if len(pl) > 0 {
 		res = append(res, pl)
@@ -134,16 +126,14 @@ func clipTop(coords []float64, top float64) [][]float64 {
 
 	pl := make([]float64, 0)
 
-	px1 := coords[0]
-	py1 := coords[1]
+	px1, py1 := coords[0], coords[1]
 	if py1 <= top {
 		pl = append(pl, px1, py1)
 	}
 
 	for i := 2; i < len(coords); i += 2 {
 
-		px2 := coords[i]
-		py2 := coords[i+1]
+		px2, py2 := coords[i], coords[i+1]
 
 		if py1 <= top && py2 <= top {
 			pl = append(pl, px2, py2)
@@ -157,8 +147,7 @@ func clipTop(coords []float64, top float64) [][]float64 {
 			pl = append(pl, (top-py1)*(px2-px1)/(py2-py1)+px1, top, px2, py2)
 		}
 
-		px1 = px2
-		py1 = py2
+		px1, py1 = px2, py2
 	}
 
 	if len(pl) > 0 {

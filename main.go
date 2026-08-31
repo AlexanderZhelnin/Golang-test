@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math/bits"
 	"os"
 	"runtime"
 	"runtime/pprof"
@@ -76,7 +77,6 @@ func writeInt(ctx *fasthttp.RequestCtx, value int) {
 
 // @Summary Получение преобразованных геоданных (тест без реального ответа)
 // @Description Выбирает геоданные по области, отсекает приметивы по области, оптимизирует координаты, преобразовывает к экранным
-// @Produce str
 // @Success 200 {int}
 func mapHandler(ctx *fasthttp.RequestCtx) {
 	args := ctx.QueryArgs()
@@ -202,6 +202,10 @@ func mapJSONBlazingHandler(ctx *fasthttp.RequestCtx) {
 	ctx.Write(e.Bytes())
 }
 
+// @Summary Натуральное сравнение 10000 пар строк
+// @Description Функция используется в натуральной сортировке, цель теста выделить все 10000 пар строк в памяти и сравнить их, из-за лени выделение 10000 пар строк происходит в том же цикле где и сравнение
+// @Success 200 {int}
+// @Router /naturalsort [get]
 func naturalSortHandler(ctx *fasthttp.RequestCtx) {
 	result := 0
 	for i := range 10000 {
@@ -211,29 +215,35 @@ func naturalSortHandler(ctx *fasthttp.RequestCtx) {
 	writeInt(ctx, result)
 }
 
-func appendInt(mas []rune, num int) {
+// Это функция копия из strconv\uscale.go
+func log10Pow2(x int) int {
+	// log₁₀ 2 ≈ 0.30102999566 ≈ 78913 / 2^18
+	return (x * 78913) >> 18
+}
 
-	digitsValue := num
+// Это функция копия из strconv\uscale.go
+// bool2 converts b to an integer: 1 for true, 0 for false.
+func bool2[T ~int | ~uint32 | ~uint64](b bool) T {
+	if b {
+		return 1
+	}
+	return 0
+}
+
+// Это Копия из strconv\uscale.go
+var uint64pow10 = [...]uint64{
+	1, 1e1, 1e2, 1e3, 1e4, 1e5, 1e6, 1e7, 1e8, 1e9,
+	1e10, 1e11, 1e12, 1e13, 1e14, 1e15, 1e16, 1e17, 1e18, 1e19,
+}
+
+// appendInt godoc
+// Преобразование целого числа в сушествубший буфер, что бы не было выделений памяти
+func appendInt(mas []rune, num uint64) {
+
 	digits := 1
-
-	for digitsValue >= 100_000 {
-		digitsValue /= 100_000
-		digits += 5
-	}
-
-	if digitsValue >= 100_000 {
-		digitsValue /= 100_000
-		digits += 5
-	}
-	if digitsValue < 10 {
-	} else if digitsValue < 100 {
-		digits = digits + 1
-	} else if digitsValue < 1000 {
-		digits = digits + 2
-	} else if digitsValue < 10_000 {
-		digits = digits + 3
-	} else {
-		digits = 4
+	if num != 0 {
+		digits := log10Pow2(bits.Len64(num))
+		digits = digits + bool2[int](num >= uint64pow10[digits])
 	}
 
 	if digits == 1 {
@@ -244,30 +254,34 @@ func appendInt(mas []rune, num int) {
 	index := digits - 1
 
 	for num > 0 {
-
 		mas[index] = rune(num%10 + '0')
 		index--
 		num /= 10
 	}
 }
 
+// naturalSortBlazingHandler godoc
+// @Summary Blazing версия натурального сравнения 10000 пар строк
+// @Description Функция используется в натуральной сортировке, цель теста выделить все 10000 пар строк в памяти и сравнить их, из-за лени выделение 10000 пар строк происходит в том же цикле где и сравнение. Используется Arena allocator для быстрого выделения и освобождения памяти unsafe
+// @Success 200 {int}
+// @Router /naturalsortBlazing [get]
 func naturalSortBlazingHandler(ctx *fasthttp.RequestCtx) {
-
 	result := 0
+	// Идёт работа с массивом rune что бы текст мог быть любой не только ascii
+	l1, l2 := len(STR1R), len(STR2R)
 
 	arena := charArenaPool.Get()
 	defer charArenaPool.Put(arena)
 
 	for i := range 10000 {
 
-		s1 := arena.allocFull(len(STR1) + 5)
+		s1 := arena.allocFull(l1 + 5)
 		copy(s1, STR1R)
+		appendInt(s1[l1:], uint64(i))
 
-		appendInt(s1[len(STR1):], i)
-
-		s2 := arena.allocFull(len(STR2) + 5)
+		s2 := arena.allocFull(l2 + 5)
 		copy(s2, STR2R)
-		appendInt(s2[len(STR2):], i)
+		appendInt(s2[l2:], uint64(i))
 
 		result += CompareRunes(s1, s2)
 	}
@@ -275,7 +289,11 @@ func naturalSortBlazingHandler(ctx *fasthttp.RequestCtx) {
 	writeInt(ctx, result)
 }
 
+// naturalSortHackHandler godoc
+// @Summary Это версия натурального сравнения 10000 пар строк Которую всё время предлагают вместо задуманной мной, но тут происходит не ТАК КАК ЗАДУМАНО!!!
+// @Success 200 {int}
 func naturalSortHackHandler(ctx *fasthttp.RequestCtx) {
+	// Тут даже не учитывается что строки могут быть не только ascii В общем всё максимально не так как задумано
 	buf1 := append(make([]byte, 0, len(STR1)+5), STR1...)
 	buf2 := append(make([]byte, 0, len(STR2)+5), STR2...)
 
@@ -302,8 +320,6 @@ func main() {
 		fmt.Print("Не могу прочитать json ", err)
 	}
 
-	// r := http.NewServeMux()
-
 	// r.HandleFunc("/swagger/*", httpSwagger.Handler(httpSwagger.URL("http://localhost:4000/swagger/doc.json")))
 
 	handler := func(ctx *fasthttp.RequestCtx) {
@@ -320,8 +336,12 @@ func main() {
 			naturalSortHandler(ctx)
 		case "/naturalsortBlazing":
 			naturalSortBlazingHandler(ctx)
+		case "/naturalsortHack":
+			naturalSortHackHandler(ctx)
 		case "/":
 			rootHandler(ctx)
+		// case "/swagger/*":
+		// 	httpSwagger.Handler(httpSwagger.URL("http://localhost:4000/swagger/doc.json"))
 		default:
 			ctx.Error("404 page not found", fasthttp.StatusNotFound)
 		}

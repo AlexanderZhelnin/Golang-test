@@ -45,10 +45,12 @@ func clipPrimitives(l *Legend, rect *Rect) iter.Seq[Obraz] {
 					return
 				}
 
-			} else if g.Rect.Left < rect.Right &&
-				g.Rect.Bottom < rect.Top &&
-				g.Rect.Right > rect.Left &&
-				g.Rect.Top > rect.Bottom {
+			} else {
+				// if g.Rect.Left < rect.Right &&
+				// 	g.Rect.Bottom < rect.Top &&
+				// 	g.Rect.Right > rect.Left &&
+				// 	g.Rect.Top > rect.Bottom
+
 				// Необходимо отсекать
 				switch l.Type {
 				case 1:

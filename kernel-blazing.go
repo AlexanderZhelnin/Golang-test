@@ -35,10 +35,7 @@ func buildBlazing(
 
 				obrazes = append(obrazes, Obraz{Name: g.Name, Coords: csOpt})
 
-			} else if g.Rect.Left < rect.Right &&
-				g.Rect.Bottom < rect.Top &&
-				g.Rect.Right > rect.Left &&
-				g.Rect.Top > rect.Bottom {
+			} else {
 				// Необходимо отсекать
 				switch l.Type {
 				case 1:
@@ -61,13 +58,6 @@ func buildBlazing(
 				}
 			}
 		}
-
-		// clipPrimitivesBlazing(arenaFloat64, l, rect, func(obraz Obraz) {
-		// 	csOpt := optimizeBlazing(arenaFloat64, obraz.Coords, mashtab)
-
-		// 	translate(csOpt, pr)
-		// 	obrazes = append(obrazes, Obraz{Name: obraz.Name, Coords: csOpt})
-		// })
 
 		result = append(result, Layer{LegendId: l.Id, Obrazes: obrazes})
 	}
