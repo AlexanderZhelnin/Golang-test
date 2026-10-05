@@ -110,9 +110,11 @@ func mapHandlerBlazing(ctx *fasthttp.RequestCtx) {
 		arenaObraz := obrazArenaPool.Get()
 		arenaLayer := layerArenaPool.Get()
 
-		defer float64ArenaPool.Put(arenaFloat64)
-		defer obrazArenaPool.Put(arenaObraz)
-		defer layerArenaPool.Put(arenaLayer)
+		defer func() {
+			float64ArenaPool.Put(arenaFloat64)
+			obrazArenaPool.Put(arenaObraz)
+			layerArenaPool.Put(arenaLayer)
+		}()
 
 		result := buildBlazing(arenaFloat64, arenaObraz, arenaLayer, ls,
 			&DrawPr{LeftTop: []float64{pr.LeftTop[0] + x, pr.LeftTop[1] + y}, Scale: pr.Scale, Mashtab: pr.Mashtab},
@@ -175,9 +177,11 @@ func mapJSONBlazingHandler(ctx *fasthttp.RequestCtx) {
 		arenaObraz := obrazArenaPool.Get()
 		arenaLayer := layerArenaPool.Get()
 
-		defer float64ArenaPool.Put(arenaFloat64)
-		defer obrazArenaPool.Put(arenaObraz)
-		defer layerArenaPool.Put(arenaLayer)
+		defer func() {
+			float64ArenaPool.Put(arenaFloat64)
+			obrazArenaPool.Put(arenaObraz)
+			layerArenaPool.Put(arenaLayer)
+		}()
 
 		resultLs := buildBlazing(arenaFloat64, arenaObraz, arenaLayer, ls,
 			&DrawPr{LeftTop: []float64{pr.LeftTop[0] + x, pr.LeftTop[1] + y}, Scale: pr.Scale, Mashtab: pr.Mashtab},
@@ -312,6 +316,7 @@ func rootHandler(ctx *fasthttp.RequestCtx) {
 }
 
 func main() {
+
 	fmt.Println("Тестовый сервер Golang")
 	plan, _ := os.ReadFile("primitives.json")
 
